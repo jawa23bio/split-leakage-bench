@@ -1,0 +1,6 @@
+data/
+results/
+tests/_synthetic/
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
