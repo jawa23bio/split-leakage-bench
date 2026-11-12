@@ -26,31 +26,10 @@ were badly overconfident.
 4. Does ensemble spread rise where predictions are wrong, and does that hold under the homology split?
 5. Optional: does the trained model recover the ATF/CREB motif (TGACGTCA)? Check with [SQUID](https://github.com/evanseitz/squid-nn) or first-layer filters.
 
-## Status
-
-| Piece | Status |
-|---|---|
-| `scripts/01_download.py` ENCODE peaks + hg38 | written; run on Colab (ENCODE is not reachable from where it was written) |
-| `scripts/02_make_dataset.py` positives + GC-matched negatives | written, tested on synthetic data |
-| `scripts/03_make_splits.py` three splits + leakage report | written, tested on synthetic data |
-| `src/slb/data.py`, `src/slb/metrics.py` | written |
-| `src/slb/model.py` the CNN | **yours to write** |
-| `src/slb/train.py` the training loop | **yours to write** (steps listed in the file) |
-| ensemble + results analysis | next, after training works |
-
-## Milestones
-
-| By | Milestone |
-|---|---|
-| Nov 15 | data built on Colab; leakage summary read; baseline CNN trains on the `chrom` split |
-| Nov 22 | all three splits trained (1 seed each) and compared |
-| Nov 29 | 5 seeds per split; ensemble calibration; repo public with results in this README |
-| Dec 5 | one sentence in the CSHL personal statement, one CV entry |
-
 ## Run it on Colab
 
 ```bash
-!git clone https://github.com/jawa23bio/split-leakage-bench.git   # after you push it
+!git clone https://github.com/jawa23bio/split-leakage-bench.git
 %cd split-leakage-bench
 !pip install -q -r requirements.txt
 
@@ -64,7 +43,7 @@ were badly overconfident.
 # 3. splits + leakage summary (read data/leakage_summary.md first: it is result 1)
 !python scripts/03_make_splits.py --dataset data/dataset.tsv --out data
 
-# 4. after you write model.py and train.py
+# 4. write model.py and train.py
 !PYTHONPATH=src python -m slb.train --scheme chrom --seed 0
 ```
 
