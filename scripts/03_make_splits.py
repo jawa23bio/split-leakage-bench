@@ -68,7 +68,7 @@ def homology_split(components, frac_val, frac_test, rng):
 
 
 def leakage(index, split, label):
-    train = set(np.nonzero(split == "train")[0].tolist())
+    train = split == "train"  # boolean mask over windows
     rows = []
     for i in np.nonzero(split == "test")[0]:
         rows.append((int(i), int(label[i]), index.max_similarity(int(i), train)))
