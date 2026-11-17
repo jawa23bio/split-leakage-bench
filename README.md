@@ -43,13 +43,17 @@ were badly overconfident.
 # 3. splits + leakage summary (read data/leakage_summary.md first: it is result 1)
 !python scripts/03_make_splits.py --dataset data/dataset.tsv --out data
 
-# 4. write model.py and train.py
-!PYTHONPATH=src python -m slb.train --scheme chrom --seed 0
+# 4. train 5 seeds per split (15 runs; switch the runtime to GPU first)
+!for s in random chrom homology; do for seed in 0 1 2 3 4; do PYTHONPATH=src python -m slb.train --scheme $s --seed $seed; done; done
+
+# 5. ensemble the seeds and answer questions 2-4 -> results/summary.md
+!python scripts/04_analyze.py --results results --leakage data/leakage.tsv
 ```
 
 Check the pipeline without downloading anything: `python tests/smoke_test.py` builds a synthetic
 genome with planted motifs and 40 test-chromosome peaks copied onto chr1, and confirms the chrom
-split reports them as leakage while the homology split does not.
+split reports them as leakage while the homology split does not. Add `--train` to also train two
+seeds on it and run the analysis (under a minute on CPU).
 
 ## Design notes
 
@@ -63,6 +67,13 @@ split reports them as leakage while the homology split does not.
 - **Threshold** 0.3 is a choice, not a law. Report how the leakage numbers move at 0.3 / 0.5 / 0.8
   (the summary prints all three).
 - **Reverse complement**: train with RC augmentation and average forward and RC predictions at test.
+- **Model selection**: the epoch with the best validation AUROC is kept (ties go to the lower
+  validation loss), with early stopping after 5 epochs without gain. Validation follows the same
+  scheme as test, so under `homology` the model is also selected on windows unlike its training set.
+- **Ensemble**: the 5 seeds share one split and differ in initialisation, batch order and RC
+  augmentation. Spread is the SD of their probabilities. Because spread and error both shrink as a
+  prediction nears 0 or 1, the analysis also reports how well spread picks out wrong calls compared
+  with the mean prediction's closeness to 0.5, which needs no ensemble.
 
 ## Layout
 
@@ -74,9 +85,10 @@ src/slb/seq.py              one-hot, reverse complement, GC
 src/slb/similarity.py       canonical k-mer index, similarity groups
 src/slb/data.py             loads one part of one split as a torch Dataset
 src/slb/metrics.py          AUROC, AUPRC, Brier, ECE, ensemble spread vs error
-src/slb/model.py            the CNN (to write)
-src/slb/train.py            the training loop (to write)
-tests/smoke_test.py         synthetic end-to-end check
+src/slb/model.py            the CNN (2 conv layers, about 83k parameters)
+src/slb/train.py            trains one model on one split -> results/<scheme>/seed<n>/
+scripts/04_analyze.py       ensembles the seeds, leaked vs clean, spread vs error -> results/summary.md
+tests/smoke_test.py         synthetic end-to-end check (--train to include training and analysis)
 ```
 
 Data: ENCODE experiment [ENCSR028UIU](https://www.encodeproject.org/experiments/ENCSR028UIU/)
