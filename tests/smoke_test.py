@@ -7,7 +7,15 @@ peak regions from the test chromosomes (chr8, chr9) onto a training chromosome
   - GC-match negatives to positives
   - report those copies as leakage under the chrom split
   - keep near-copies out of test under the homology split
+
+With --train it also trains two seeds on the chrom split (CPU, under a minute) and runs
+the analysis, to check the model, the training loop and 04_analyze.py end to end. The
+planted motif makes the task trivial, so this checks that the code runs and learns,
+not that the benchmark's conclusions hold.
 """
+
+import argparse
+import os
 
 import subprocess
 import sys
@@ -27,6 +35,10 @@ def rand_seq(rng, n, gc=0.42):
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--train", action="store_true", help="also train two seeds and run the analysis")
+    args = ap.parse_args()
+
     rng = np.random.default_rng(1)
     WORK.mkdir(parents=True, exist_ok=True)
     chroms = {f"chr{i}": list(rand_seq(rng, 600_000)) for i in range(1, 10)}
@@ -75,6 +87,23 @@ def main():
         assert set(sp[s]) == {"train", "val", "test"}, s
     print(f"\nSMOKE TEST PASSED: chrom split leaks {chrom_hi} test windows (>=0.5 similar to train); "
           f"homology split leaks {hom_hi}.")
+
+    if args.train:
+        env = {**os.environ, "PYTHONPATH": str(ROOT / "src")}
+        res = WORK / "results"
+        for seed in (0, 1):
+            subprocess.run([py, "-m", "slb.train", "--dataset", WORK / "dataset.tsv", "--splits", WORK / "splits.tsv",
+                            "--scheme", "chrom", "--seed", str(seed), "--epochs", "8", "--out", res],
+                           check=True, env=env)
+        subprocess.run([py, ROOT / "scripts/04_analyze.py", "--results", res, "--leakage", WORK / "leakage.tsv"],
+                       check=True)
+        summ = pd.read_csv(res / "summary.tsv", sep="\t").set_index("scheme").loc["chrom"]
+        pred = pd.read_csv(res / "chrom" / "seed0" / "test_predictions.tsv", sep="\t")
+        n_test = int((sp["chrom"] == "test").sum())
+        assert len(pred) == n_test and pred["prob"].between(0, 1).all(), "bad test_predictions.tsv"
+        assert summ["seeds"] == 2 and summ["ens_auroc"] > 0.95, f"model did not learn the planted motif: {summ['ens_auroc']}"
+        assert abs(summ["leaked_frac"] - chrom_hi / n_test) < 0.02, "leaked share in the analysis disagrees with leakage.tsv"
+        print(f"\nTRAINING SMOKE TEST PASSED: chrom ensemble AUROC {summ['ens_auroc']:.3f} on {n_test} test windows.")
 
 
 if __name__ == "__main__":

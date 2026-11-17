@@ -10,8 +10,9 @@ def load_split(dataset_tsv, splits_tsv, scheme, part):
     """Return (sequences, labels, ids) for one part ('train'/'val'/'test') of one scheme."""
     df = pd.read_csv(dataset_tsv, sep="\t")
     sp = pd.read_csv(splits_tsv, sep="\t")
-    df = df.merge(sp[["id", scheme]], on="id")
-    df = df[df[scheme] == part]
+    # rename before merging: the scheme named "chrom" collides with dataset.tsv's chrom column
+    df = df.merge(sp[["id", scheme]].rename(columns={scheme: "_part"}), on="id", validate="one_to_one")
+    df = df[df["_part"] == part]
     return df["seq"].tolist(), df["label"].to_numpy(np.float32), df["id"].to_numpy()
 
 
